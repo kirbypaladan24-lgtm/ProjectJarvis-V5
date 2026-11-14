@@ -1,0 +1,25 @@
+Tasks:
+  "Create a task to fix the bug by Friday"
+  "Show my tasks"
+  "Complete task 1"
+  "List all tasks"
+
+Files:
+  "Find my resume"
+  "Search for PDFs"
+  "Open that file"
+
+Notes:
+  "Note that I need to buy milk"
+  "Remember to call mom"
+  "Find my notes about Python"
+  "Show all notes"
+
+System Monitor:
+  "How's my computer?"
+  "What's running?"
+  "System status"
+
+Command History:
+  "What do I usually ask about?" (Shows patterns)
+  "Suggest shortcuts" (Shows frequently used commands)

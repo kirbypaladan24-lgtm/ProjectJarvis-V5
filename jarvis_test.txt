@@ -1,0 +1,4 @@
+Project Protocol: Operation JARVIS.
+This is a test document containing system integration notes. 
+The current date is May 25, 2026. 
+The primary goal is to ensure the local AI can ingest, read, and summarize system files accurately.

@@ -1,0 +1,83 @@
+# ═══════════════════════════════════════════════════════════════════════
+# JARVIS Knowledge Query Routing Configuration
+# ═══════════════════════════════════════════════════════════════════════
+#
+# This file controls which model handles your knowledge file queries.
+#
+# WHITELIST = Safe for the 1.5B model (fast, 2 seconds)
+#   These are SINGLE-VALUE lookups — the 1.5B finds one number/name and reports it.
+#   Examples: "what's my GWA", "what's my student ID", "what's my name"
+#
+# BLACKLIST = Must use the 8B model (slower, 5-10 seconds, but accurate)
+#   These require LISTING, COMPARING, or PARSING multiple values.
+#   The 1.5B cannot handle these — it picks random numbers or stops early.
+#   Examples: "what's my grades", "equivalent per course", "highest grade"
+#
+# HOW IT WORKS:
+#   1. When you ask a knowledge question, JARVIS checks this file
+#   2. If your query contains a BLACKLIST word → skips 1.5B, goes to 8B directly
+#   3. If your query contains a WHITELIST word (and no blacklist word) → tries 1.5B first
+#   4. If neither → defaults to 8B (safe)
+#
+# TO EDIT:
+#   - Add one word/phrase per line
+#   - Lines starting with # are ignored
+#   - Words are case-insensitive
+#   - Partial matching is used (e.g., "grade" matches "grades", "gradebook", etc.)
+#
+# ═══════════════════════════════════════════════════════════════════════
+
+[WHITELIST_1.5B]
+# These are safe for the fast 1.5B model — single value lookups only
+gwa
+student id
+id number
+my name
+my address
+my birthday
+my phone
+my email
+my course
+my program
+my year
+my school
+
+[BLACKLIST_1.5B]
+# These MUST skip the 1.5B — they need the 8B for accuracy
+# Listing multiple items
+grades
+grade
+equivalent
+subjects
+courses
+all
+list
+every
+each
+per course
+midterm
+finals
+average
+credits
+passed
+failed
+remarks
+# Comparisons
+highest
+lowest
+best
+worst
+compare
+comparison
+which is
+sort
+calculate
+how many
+count
+# Document summaries
+summarize
+summary
+overview
+what's in
+whats in
+what is in

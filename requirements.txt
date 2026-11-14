@@ -1,0 +1,64 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# JARVIS AI Assistant — Python Dependencies
+# Python 3.12+
+# Install all: pip install -r requirements.txt
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── AI / ML Core ──────────────────────────────────────────────────────────────
+faster-whisper               # Speech-to-text (Whisper model)
+sentence-transformers        # Semantic embeddings for memory
+faiss-cpu                    # Vector similarity search
+tiktoken                     # Token counting
+
+# ── Audio ─────────────────────────────────────────────────────────────────────
+sounddevice                  # Audio recording/playback
+soundfile                    # Audio file I/O (.wav, .flac)
+scipy                        # WAV file writing (scipy.io.wavfile)
+pyaudiowpatch                # WASAPI loopback audio capture (Windows)
+
+# ── Computer Vision / Screen ─────────────────────────────────────────────────
+opencv-python                # Camera access (cv2)
+Pillow                       # Image processing (PIL)
+pytesseract                  # OCR - screen text extraction
+pyautogui                    # Mouse/keyboard automation + screenshots
+
+# ── Windows System Control ────────────────────────────────────────────────────
+pywin32                      # win32api, win32gui, win32con, win32process, win32com, win32clipboard, pythoncom, pywintypes
+comtypes                     # COM interface (audio control)
+pycaw                        # Windows audio endpoint control
+screen-brightness-control    # Monitor brightness control
+psutil                       # System resource monitoring
+pygetwindow                  # Window management (gw)
+pynput                       # Keyboard listener (hotkeys)
+
+# ── Web / Networking ─────────────────────────────────────────────────────────
+requests                     # HTTP requests
+duckduckgo_search            # Web search (DDGS)
+beautifulsoup4               # HTML parsing
+
+# ── Browser Automation ────────────────────────────────────────────────────────
+playwright                   # Browser control for web agent
+
+# ── Document Processing ──────────────────────────────────────────────────────
+python-docx                  # .docx file reading (docx)
+openpyxl                     # .xlsx Excel file reading
+pypdf                        # PDF file reading
+
+# ── Spotify ───────────────────────────────────────────────────────────────────
+spotipy                      # Spotify Web API
+
+# ── Telegram Bot ──────────────────────────────────────────────────────────────
+python-telegram-bot          # Telegram bot integration
+
+# ── Date/Time ─────────────────────────────────────────────────────────────────
+dateparser                   # Natural language date parsing
+pytz                         # Timezone support
+
+# ── Clipboard ─────────────────────────────────────────────────────────────────
+pyperclip                    # Cross-platform clipboard access
+
+# ── File Watching ─────────────────────────────────────────────────────────────
+watchdog                     # File system change monitoring
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+numpy                        # Numerical operations

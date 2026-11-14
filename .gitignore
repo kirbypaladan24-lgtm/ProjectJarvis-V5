@@ -1,0 +1,23 @@
+# Secrets — never commit these (.env holds tokens/keys locally)
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.bak
+
+# Runtime data & caches
+command_history.json
+*.log
+.spotify_cache
+memory/
+chroma/
+faiss/
+*.index
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store

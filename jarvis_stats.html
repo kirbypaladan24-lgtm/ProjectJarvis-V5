@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Telemetry Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        h1 { color: #58a6ff; margin-bottom: 20px; font-size: 28px; }
+        h2 { color: #8b949e; margin: 20px 0 10px; font-size: 18px; text-transform: uppercase; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .stat { display: flex; justify-content: space-between; margin: 8px 0; }
+        .stat-label { color: #8b949e; }
+        .stat-value { color: #58a6ff; font-weight: bold; }
+        .bar { height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; margin: 4px 0; }
+        .bar-fill { height: 100%; background: #58a6ff; transition: width 0.3s; }
+        .bar-fill.green { background: #3fb950; }
+        .bar-fill.yellow { background: #d29922; }
+        .bar-fill.red { background: #f85149; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #30363d; }
+        th { color: #8b949e; font-size: 12px; text-transform: uppercase; }
+        .refresh-btn {
+            background: #238636; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 14px;
+        }
+        .refresh-btn:hover { background: #2ea043; }
+        .timestamp { color: #8b949e; font-size: 12px; }
+        .tier-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 12px;
+            font-size: 11px; font-weight: bold;
+        }
+        .tier-ack { background: #1f6feb; color: white; }
+        .tier-pattern { background: #238636; color: white; }
+        .tier-1.5b { background: #d29922; color: white; }
+        .tier-qwen3 { background: #8957e5; color: white; }
+        .error { color: #f85149; }
+        .success { color: #3fb950; }
+    </style>
+</head>
+<body>
+    <h1>🤖 JARVIS Telemetry Dashboard</h1>
+    <p class="timestamp" id="last-update">Loading...</p>
+    <button class="refresh-btn" onclick="loadMetrics()">Refresh</button>
+
+    <h2>System Health</h2>
+    <div class="grid">
+        <div class="card" id="health-card">
+            <p>Loading system health...</p>
+        </div>
+        <div class="card" id="budget-card">
+            <p>Loading budget...</p>
+        </div>
+        <div class="card" id="feedback-card">
+            <p>Loading feedback...</p>
+        </div>
+    </div>
+
+    <h2>Latency by Tier (seconds)</h2>
+    <div class="grid" id="latency-grid">
+        <p>Loading...</p>
+    </div>
+
+    <h2>Tool Success Rates</h2>
+    <div class="card">
+        <table id="tools-table">
+            <thead>
+                <tr><th>Tool</th><th>Success</th><th>Failure</th><th>Total</th><th>Rate</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <h2>Tier Distribution</h2>
+    <div class="card" id="tier-dist-card">
+        <p>Loading...</p>
+    </div>
+
+    <h2>Error Log</h2>
+    <div class="card">
+        <table id="errors-table">
+            <thead><tr><th>Error Code</th><th>Count</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        async function loadMetrics() {
+            try {
+                const response = await fetch('metrics.json');
+                const data = await response.json();
+                displayMetrics(data);
+            } catch (e) {
+                document.body.innerHTML += '<p class="error">Could not load metrics.json. Make sure JARVIS is running.</p>';
+            }
+        }
+
+        function displayMetrics(data) {
+            document.getElementById('last-update').textContent = 'Last updated: ' + data.timestamp;
+
+            // Budget
+            const budget = data.token_budget || {};
+            document.getElementById('budget-card').innerHTML = `
+                <h3>Token Budget</h3>
+                <div class="stat"><span class="stat-label">Calls this hour:</span><span class="stat-value">${budget.calls_this_hour || 0} / 200</span></div>
+                <div class="bar"><div class="bar-fill ${(budget.calls_this_hour||0) > 160 ? 'red' : (budget.calls_this_hour||0) > 100 ? 'yellow' : 'green'}" style="width: ${((budget.calls_this_hour||0)/200*100)}%"></div></div>
+                <div class="stat"><span class="stat-label">Calls today:</span><span class="stat-value">${budget.calls_today || 0} / 2000</span></div>
+                <div class="bar"><div class="bar-fill ${(budget.calls_today||0) > 1600 ? 'red' : (budget.calls_today||0) > 1000 ? 'yellow' : 'green'}" style="width: ${((budget.calls_today||0)/2000*100)}%"></div></div>
+            `;
+
+            // Feedback
+            const fb = data.feedback || {};
+            const total = (fb.likely_correct || 0) + (fb.likely_wrong || 0);
+            const accuracy = total > 0 ? Math.round((fb.likely_correct || 0) / total * 100) : 0;
+            document.getElementById('feedback-card').innerHTML = `
+                <h3>Implicit Feedback</h3>
+                <div class="stat"><span class="stat-label">Likely correct:</span><span class="stat-value success">${fb.likely_correct || 0}</span></div>
+                <div class="stat"><span class="stat-label">Likely wrong:</span><span class="stat-value error">${fb.likely_wrong || 0}</span></div>
+                <div class="stat"><span class="stat-label">Accuracy:</span><span class="stat-value">${accuracy}%</span></div>
+            `;
+
+            // Latency
+            const latency = data.latency || {};
+            let latencyHtml = '';
+            for (const [tier, stats] of Object.entries(latency)) {
+                if (stats.count === 0) continue;
+                latencyHtml += `
+                    <div class="card">
+                        <h3>${tier}</h3>
+                        <div class="stat"><span class="stat-label">Count:</span><span class="stat-value">${stats.count}</span></div>
+                        <div class="stat"><span class="stat-label">Average:</span><span class="stat-value">${stats.avg}s</span></div>
+                        <div class="stat"><span class="stat-label">p50:</span><span class="stat-value">${stats.p50}s</span></div>
+                        <div class="stat"><span class="stat-label">p90:</span><span class="stat-value">${stats.p90}s</span></div>
+                        <div class="stat"><span class="stat-label">p99:</span><span class="stat-value">${stats.p99}s</span></div>
+                    </div>
+                `;
+            }
+            document.getElementById('latency-grid').innerHTML = latencyHtml || '<p>No latency data yet.</p>';
+
+            // Tools
+            const tools = data.tool_calls || {};
+            const toolsTbody = document.querySelector('#tools-table tbody');
+            toolsTbody.innerHTML = '';
+            for (const [tool, stats] of Object.entries(tools)) {
+                const rateClass = stats.success_rate >= 90 ? 'success' : stats.success_rate >= 70 ? '' : 'error';
+                toolsTbody.innerHTML += `
+                    <tr>
+                        <td>${tool}</td>
+                        <td class="success">${stats.success}</td>
+                        <td class="error">${stats.failure}</td>
+                        <td>${stats.total}</td>
+                        <td class="${rateClass}">${stats.success_rate}%</td>
+                    </tr>
+                `;
+            }
+
+            // Tier distribution
+            const tiers = data.tier_distribution || {};
+            const totalTier = Object.values(tiers).reduce((a,b) => a+b, 0);
+            let tierHtml = '';
+            for (const [tier, count] of Object.entries(tiers)) {
+                const pct = totalTier > 0 ? Math.round(count/totalTier*100) : 0;
+                tierHtml += `
+                    <div class="stat">
+                        <span class="stat-label">${tier}:</span>
+                        <span class="stat-value">${count} (${pct}%)</span>
+                    </div>
+                `;
+            }
+            document.getElementById('tier-dist-card').innerHTML = tierHtml || '<p>No data yet.</p>';
+
+            // Errors
+            const errors = data.errors || {};
+            const errorsTbody = document.querySelector('#errors-table tbody');
+            errorsTbody.innerHTML = '';
+            for (const [code, count] of Object.entries(errors)) {
+                errorsTbody.innerHTML += `<tr><td class="error">${code}</td><td>${count}</td></tr>`;
+            }
+            if (errorsTbody.innerHTML === '') {
+                errorsTbody.innerHTML = '<tr><td colspan="2" class="success">No errors! 🎉</td></tr>';
+            }
+        }
+
+        // Auto-refresh every 10 seconds
+        loadMetrics();
+        setInterval(loadMetrics, 10000);
+    </script>
+</body>
+</html>

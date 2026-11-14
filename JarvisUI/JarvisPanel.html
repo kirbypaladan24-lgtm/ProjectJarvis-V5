@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS OS - STARK PROTOTYPE (SCROLL EDITION)</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --core: #ffffff;
+    --pri: #66e3ff; /* Master primary color */
+    --pri-dim: rgba(102, 227, 255, 0.4);
+    --pri-dk: rgba(0, 114, 150, 0.4);
+    --bg-dark: #000c14;
+    --text: 'Rajdhani', sans-serif;
+    --num: 'Share Tech Mono', monospace;
+  }
+
+  /* MODES: COMBAT / STEALTH */
+  body.mode-combat { --pri: #ff3333; --pri-dim: rgba(255,51,51,0.4); --pri-dk: rgba(150,0,0,0.4); }
+  body.mode-stealth { --pri: #555555; --pri-dim: rgba(100,100,100,0.4); --pri-dk: rgba(30,30,30,0.4); }
+
+  * { box-sizing: border-box; padding: 0; margin: 0; user-select: none; }
+  body { 
+    background: var(--bg-dark); color: var(--pri); font-family: var(--text);
+    overflow: hidden; perspective: 1200px; cursor: none;
+    transition: background-color 1s ease;
+    touch-action: none; /* Disables standard page scrolling bouncing */
+  }
+
+  /* ------------ CUSTOM HUD CURSOR ------------ */
+  #cursor {
+    position: fixed; width: 40px; height: 40px; border-radius: 50%; pointer-events: none; z-index: 9999;
+    border: 1px dashed var(--pri); display: flex; align-items: center; justify-content: center;
+    transform: translate(-50%, -50%); transition: width 0.2s, height 0.2s; mix-blend-mode: screen;
+  }
+  #cursor::before {
+    content:''; position:absolute; width: 4px; height: 4px; background: #fff; box-shadow: 0 0 10px #fff;
+  }
+  #cursor.active { width: 25px; height: 25px; border-style: solid; border-color: #fff; background: rgba(255,255,255,0.2);}
+  .dot-cursor-track { position: absolute; width:100%; height:100%; border: 1px solid var(--pri); animation: spinC 4s linear infinite; pointer-events:none;}
+  @keyframes spinC { 0%{ transform: rotate(0deg); } 100%{ transform: rotate(360deg); } }
+
+  /* ------------ BG FX & LAYOUT ------------ */
+  .grid-bg {
+    position: fixed; inset: -100vw; z-index: -10;
+    background: 
+      linear-gradient(rgba(102,227,255,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(102,227,255,0.08) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px; opacity: 0.5;
+  }
+  .scanlines { position: fixed; inset: 0; z-index: 99; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px); }
+  
+  .ui-container { 
+    position: relative; width: 100vw; height: 100vh; padding: 25px;
+    display: flex; justify-content: space-between; z-index: 10;
+    transform-style: preserve-3d; transition: transform 0.15s ease-out; /* Handles Parallax and Zoom physics */
+  }
+
+  .side-col { width: 330px; height: 100%; display: flex; flex-direction: column; gap: 8px; z-index: 10; transform: translateZ(30px); }
+  .center-col { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;}
+
+  /* ------------ MODULE PANELS ------------ */
+  .widget {
+    background: rgba(0, 10, 16, 0.7); border: 1px solid var(--pri-dk); position: relative;
+    padding: 4px; display: flex; flex-direction: column; overflow: hidden; backdrop-filter: blur(4px);
+  }
+  .widget::before { 
+      content:''; position: absolute; top:-50%; left:0; width: 100%; height: 10px; background: var(--pri);
+      box-shadow: 0 0 15px var(--pri), 0 0 50px #fff; opacity:0; pointer-events: none; transition: 0s; z-index:50;
+  }
+  .widget:hover::before { opacity: 0.3; animation: scanHov 1.5s linear infinite; }
+  @keyframes scanHov { 0%{top:-10%} 100%{top:110%} }
+  
+  .widget-inner {
+      border: 1px solid var(--pri-dk); flex: 1; padding: 5px; position: relative;
+      clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
+  }
+  
+  .header-sys { background: var(--pri-dk); color: #fff; font-size: 11px; font-weight: bold; letter-spacing: 2px; padding: 2px 8px; margin-bottom: 5px; text-transform: uppercase; border-left: 2px solid var(--pri); text-shadow: 0 0 5px var(--pri);}
+  .txt-s { font-size: 9px; letter-spacing: 1px; color: var(--pri); text-transform: uppercase; }
+  .val { font-family: var(--num); color: #fff; text-shadow: 0 0 4px var(--pri);}
+  
+  .graph { width: 100%; background: transparent; display: block;}
+  .data-list { list-style: none; padding:0; }
+  .data-list li { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; border-bottom: 1px solid var(--pri-dk);}
+
+  /* BARS */
+  .p-row { display: flex; gap: 4px; margin-top: 4px; }
+  .p-box { background: rgba(0,0,0,0.5); border: 1px solid var(--pri-dk); height: 14px; flex: 1; position: relative;}
+  .p-fill { height: 100%; background: var(--pri-dim); transition: width 0.4s; }
+  .p-txt { position: absolute; inset:0; font-family: var(--num); font-size: 10px; color: #fff; line-height: 14px; text-align: center; text-shadow: 0 0 3px #000; }
+
+  /* COMMAND TERMINAL */
+  #term-out { height: 75px; font-family: var(--num); font-size: 11px; overflow-y: hidden; margin-top:5px; color: #fff;}
+  .cmd-line { width: 100%; background: rgba(255,255,255,0.05); border: none; border-bottom: 2px solid var(--pri); color: #fff; font-family: var(--num); font-size: 13px; outline: none; padding: 4px;}
+
+  /* CORE HUD & CENTER */
+  #core { filter: drop-shadow(0 0 15px var(--pri-dim)); width: 850px; height: 850px; transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1); cursor: none;}
+  #core:active { transform: scale(1.03); filter: drop-shadow(0 0 30px var(--pri)); }
+
+  #hud-titles { position: absolute; width:100%; top:25px; left:0; display:flex; justify-content:center; flex-direction:column; align-items:center; z-index:20;}
+  .os-badge { border: 2px solid var(--pri); padding: 5px 25px; border-radius: 50px; font-weight:700; letter-spacing:4px; font-size: 20px; color:#fff; box-shadow: inset 0 0 10px var(--pri); text-shadow: 0 0 10px var(--pri);}
+  .brand { position:absolute; bottom:30px; left:50%; transform: translateX(-50%); font-weight: bold; font-size: 32px; letter-spacing: 15px; color:rgba(255,255,255,0.8); }
+  
+  /* OVERLAYS & BOOT SEQUENCE */
+  #boot-mask { position: fixed; inset: 0; background: var(--bg-dark); z-index: 1000; display:flex; align-items:center; padding: 40px; color: var(--pri); font-family: var(--num); font-size: 14px; }
+  .glitch-flash { position: fixed; inset:0; background: #fff; opacity:0; z-index:900; pointer-events: none;}
+  
+</style>
+</head>
+<body>
+
+<div id="boot-mask"><div id="boot-log"></div></div>
+<div class="glitch-flash" id="gl-flash"></div>
+
+<div class="grid-bg"></div>
+<div class="scanlines"></div>
+
+<div id="cursor"><div class="dot-cursor-track"></div></div>
+
+<!-- Main interface linked to 3D Map Transform (Rotate AND Zoom Scale) -->
+<div class="ui-container" id="sys-board">
+  
+  <div id="hud-titles">
+      <div class="os-badge">MK.VI // STARK.SYS</div>
+      <div class="txt-s" style="margin-top:5px; padding: 2px 5px; background:var(--pri-dk);">AI NEURAL NET PROTOCOL STANDBY</div>
+  </div>
+  <div class="brand">STARK_IND</div>
+
+  <!-- LEFT HUD DATA COL -->
+  <div class="side-col">
+    <div class="widget">
+       <div class="header-sys">SYS LOAD OVERRIDE // DB LOG</div>
+       <div class="widget-inner">
+           <canvas id="gr1" class="graph" height="60"></canvas>
+           <ul class="data-list" style="margin-top:6px;">
+               <li>MEMORY CACHE USAGE <span class="val">88.5 GB</span></li>
+               <li>UPLINK THROUGHPUT <span class="val">5400 T/S</span></li>
+           </ul>
+       </div>
+    </div>
+    
+    <div class="widget" style="flex:1;">
+        <div class="header-sys">CORTEX RADAR MATRIX</div>
+        <div class="widget-inner">
+             <canvas id="radarCanv" class="graph" style="height: 180px;"></canvas>
+             <div class="p-row">
+                 <div class="p-box"><div class="p-fill cbar" data-p="90"></div><div class="p-txt">SNR</div></div>
+                 <div class="p-box"><div class="p-fill cbar" data-p="40"></div><div class="p-txt">RDR</div></div>
+                 <div class="p-box"><div class="p-fill cbar" data-p="100" style="background:#fff"></div><div class="p-txt" style="color:#000">TRK</div></div>
+             </div>
+        </div>
+    </div>
+    
+    <div class="widget" style="min-height: 170px;">
+        <div class="header-sys">JARVIS INTERFACE TERMINAL</div>
+        <div class="widget-inner">
+             <div class="txt-s" style="line-height:1.2; font-weight:bold; color:#fff;">[ ! ] INPUT COMBAT / RESET TO SHIFT THEMES.<br>[ ! ] MOUSE SCROLL FOR HOLO-ZOOM SCALE.</div>
+             <div id="term-out">
+                 > ESTABLISHING SECURE HANDSHAKE...<br>> STARK INTEL HUB OPERATIVE.<br>
+             </div>
+             <form id="tForm" style="position:absolute; bottom:5px; left:5px; right:5px;">
+                <input class="cmd-line" id="tIn" type="text" placeholder="TYPE CMD STR //">
+             </form>
+        </div>
+    </div>
+  </div>
+  
+  <!-- CENTER REACTOR MAP -->
+  <div class="center-col" id="reactor-area">
+      <canvas id="core"></canvas>
+  </div>
+  
+  <!-- RIGHT HUD DATA COL -->
+  <div class="side-col">
+     <div class="widget" style="height:140px;">
+        <div class="widget-inner" style="display:flex; justify-content:space-between; flex-direction:column;">
+            <div>
+               <div class="txt-s" style="float:right;">NEW YORK METRO. LIVE LINK</div>
+               <div style="font-size:38px; color:#fff; line-height:0.9; text-shadow:0 0 8px var(--pri);">18&deg;C</div>
+            </div>
+            <div>
+               <ul class="data-list">
+                 <li>Wind Speed/Dir <span class="val">14 KH SW</span></li>
+                 <li>Radiation/Ozone <span class="val">NOMINAL</span></li>
+                 <li>Threat Horizon <span class="val" style="color:var(--core);">ALL CLEAR</span></li>
+               </ul>
+            </div>
+            <div id="hudTime" style="font-size: 26px; text-align:right; border-top: 1px dashed var(--pri-dk); color:#fff; font-family: var(--num);">
+            </div>
+        </div>
+     </div>
+
+     <div class="widget" style="flex:1;">
+        <div class="header-sys">PROPULSION TELEMETRY (R&L)</div>
+        <div class="widget-inner">
+             <canvas id="gr2" class="graph" style="height:90px"></canvas>
+             <canvas id="gr3" class="graph" style="height:70px; margin-top:5px;"></canvas>
+             <div style="margin-top:10px;">
+                <div class="txt-s">MK VI // REPULSOR CALIBRATION</div>
+                <div class="p-row">
+                    <div class="p-box"><div class="p-fill" style="width:64%"></div></div>
+                    <div class="p-box"><div class="p-fill" style="width:100%"></div></div>
+                    <div class="p-box"><div class="p-fill" style="width:12%"></div></div>
+                    <div class="p-box"><div class="p-fill" style="width:44%"></div></div>
+                    <div class="p-box"><div class="p-fill" style="width:78%"></div></div>
+                </div>
+             </div>
+        </div>
+     </div>
+  </div>
+
+</div>
+
+<script>
+// ----- GLOBAL VARS & MULTIPLIERS -----
+let energyM = 1.0; 
+const gcolor = () => getComputedStyle(document.body).getPropertyValue('--pri').trim();
+
+// Matrix engine math stores Parallax Rotations & Zoom Depth
+let tMatrix = { zoom: 1.0, rx: 0, ry: 0 }; 
+
+const curs = document.getElementById('cursor');
+const uiBoard = document.getElementById('sys-board');
+
+// Compiles and commits rotations + holoscrolling to DOM frame
+function drawEngineMatrix() {
+  uiBoard.style.transform = `scale(${tMatrix.zoom}) rotateY(${tMatrix.ry}deg) rotateX(${tMatrix.rx}deg)`;
+}
+
+// Intercept scroll wheel physics for 3D depth holographics zooming 
+window.addEventListener('wheel', (ev) => {
+    // Math stops windows level native bounces overriding physics layer
+    if (ev.ctrlKey) ev.preventDefault(); 
+    
+    // Zoom algorithm scalar per-spin
+    let vZoomSpd = 0.08;
+    if (ev.deltaY > 0) tMatrix.zoom -= vZoomSpd; // wheel pulling toward user
+    else tMatrix.zoom += vZoomSpd;               // pushing deep inward 
+    
+    // Confine between safe zooming limits (.5 limits cutoff, 2 zooms to deep panel core views)
+    tMatrix.zoom = Math.max(0.45, Math.min(tMatrix.zoom, 2.3)); 
+    drawEngineMatrix();
+}, { passive: false });
+
+
+// INTERCEPT HOVERS & ALIGN PARALLAX CAMERA 
+document.addEventListener('mousemove', e => {
+  // Center HUD mapping alignment math calculations 
+  curs.style.left = e.clientX + 'px';
+  curs.style.top = e.clientY + 'px';
+  if(e.target.tagName==='INPUT' || e.target.id === 'core') curs.classList.add('active'); else curs.classList.remove('active');
+
+  let w = window.innerWidth, h = window.innerHeight;
+  tMatrix.ry = (w/2 - e.pageX) / 45; 
+  tMatrix.rx = -(h/2 - e.pageY) / 30; 
+  drawEngineMatrix(); // Call matrix build loop upon shifts
+});
+
+// React component charge events
+document.getElementById('reactor-area').onmousedown = () => energyM = 4.0;
+document.getElementById('reactor-area').onmouseup = () => energyM = 1.0;
+
+
+// ----- CORE CANVAS SCRIPT (MK VI REVISED INTERACTIVE TRIANGLE) -----
+const cc = document.getElementById('core');
+const cxx = cc.getContext('2d');
+const sSize = 850, cy = sSize/2, cx = sSize/2;
+cc.width = sSize; cc.height = sSize;
+let ctT = 0;
+
+function drwRng(r, l, segs, tOff, speed, dashArr, style) {
+    cxx.save(); cxx.translate(cx,cy); cxx.rotate(ctT*speed + tOff);
+    cxx.lineWidth = l; cxx.strokeStyle = gcolor();
+    if(style === 'fade') cxx.strokeStyle = `rgba(255,255,255,0.4)`;
+    
+    if (segs==0) { cxx.beginPath(); cxx.arc(0,0, r,0,Math.PI*2); cxx.stroke(); } 
+    else if (dashArr.length > 0) { cxx.setLineDash(dashArr); cxx.beginPath(); cxx.arc(0,0,r,0,Math.PI*2); cxx.stroke(); cxx.setLineDash([]); }
+    else {
+        let stps = Math.PI*2/segs;
+        for (let i=0; i<segs; i++) {
+           let ax = i*stps; cxx.beginPath(); cxx.arc(0,0,r,ax, ax+(stps*0.75)); cxx.stroke();
+        }
+    } cxx.restore();
+}
+
+function runReactor() {
+    cxx.clearRect(0,0,sSize,sSize);
+    ctT += 0.01 * (energyM < 2 ? 1 : energyM * 0.8);
+    let rG = energyM > 1.2 ? `rgba(255,255,255,0.7)` : gcolor();
+
+    // Core Ambient Radial backlight renderings
+    let gl = cxx.createRadialGradient(cx,cy,20, cx,cy, 350 + (energyM*20));
+    gl.addColorStop(0, '#fff'); gl.addColorStop(0.2, gcolor()); gl.addColorStop(1, 'transparent');
+    cxx.fillStyle = gl; cxx.fillRect(0,0,sSize,sSize);
+
+    drwRng(125, 4, 18, 0, -0.6, []); drwRng(145, 1, 0, 0, 0, [], 'fade');
+
+    // === INVERTED TRIANGLE DRAW PROCESS ===
+    cxx.save(); cxx.translate(cx,cy);
+    if(energyM > 1.1) cxx.rotate( (Math.random()*0.02 - 0.01) * energyM ); 
+    cxx.rotate(Math.PI); const rTri = 185;
+
+    cxx.beginPath();
+    for (let i=0; i<3; i++) {
+        let ptA = (Math.PI*2) * (i/3); let tx = Math.sin(ptA)*rTri; let ty = Math.cos(ptA)*rTri;
+        i===0 ? cxx.moveTo(tx, ty) : cxx.lineTo(tx,ty);
+    } cxx.closePath();
+    cxx.lineJoin="bevel"; cxx.shadowColor="#fff"; cxx.shadowBlur= 20 + (energyM*15);
+
+    cxx.strokeStyle=gcolor(); cxx.lineWidth=45; cxx.stroke(); cxx.strokeStyle="#fff"; cxx.lineWidth=12; cxx.stroke();
+    
+    // Core white power sphere geometry code structure processing! 
+    cxx.beginPath(); cxx.arc(0,0,55 + (energyM*10), 0, Math.PI*2);
+    cxx.fillStyle='#fff'; cxx.fill(); 
+    cxx.shadowBlur = 0; cxx.lineWidth=3; cxx.strokeStyle=gcolor(); cxx.stroke(); cxx.restore();
+    
+    // Frame rim blocks and targeting hashes execution vectors
+    drwRng(235, 15, 36, 0, 0.2, []); drwRng(270, 2, 0, 0, 0, [4, 25]); drwRng(305, 3, 0, 0, -0.05, [60,25], 'fade');
+    drwRng(330, 20, 10, -ctT, -0.4, []); 
+    
+    cxx.save(); cxx.translate(cx,cy);
+    cxx.lineWidth=1.5; cxx.strokeStyle=rG; cxx.globalAlpha=0.6;
+    let bSt = Math.PI*2/90;
+    for(let j=0; j<90; j++) {
+       if(j%10===0)continue; cxx.beginPath(); let ll = j%3===0 ? 370 : 380;
+       cxx.moveTo(Math.cos(j*bSt)*395, Math.sin(j*bSt)*395); cxx.lineTo(Math.cos(j*bSt)*ll, Math.sin(j*bSt)*ll); cxx.stroke();
+    }
+    
+    cxx.rotate(ctT*0.5); cxx.strokeStyle = gcolor(); cxx.globalAlpha=1.0; cxx.lineWidth=3;
+    for(let h=0; h<4; h++) {
+       cxx.rotate(Math.PI/2); cxx.beginPath(); cxx.arc(0,0, 390, 0.05, 0.25); cxx.stroke();
+       cxx.beginPath(); cxx.moveTo(Math.cos(0.15)*390, Math.sin(0.15)*390); cxx.lineTo(Math.cos(0.15)*(390-30), Math.sin(0.15)*(390-30)); cxx.stroke();
+    } cxx.restore(); requestAnimationFrame(runReactor);
+}
+
+// ----- ANIMATED SIDE PANELS GRAPH RENDERING LOGIC DATA PROCESSING -----
+let gcT=0;
+function bldChart(id, config) {
+   const cnv = document.getElementById(id); const gCtx = cnv.getContext('2d');
+   cnv.width = cnv.parentElement.clientWidth - 12;
+
+   function runGrid() {
+      gCtx.clearRect(0,0,cnv.width, cnv.height); gcT+= config.spd;
+      let W = cnv.width, H = cnv.height;
+      gCtx.lineWidth=1; gCtx.strokeStyle='rgba(255,255,255,0.1)';
+      for(let x=10; x<W; x+=15){ gCtx.beginPath(); gCtx.moveTo(x,0); gCtx.lineTo(x,H); gCtx.stroke(); }
+      
+      if (config.type === 'waveform') {
+          gCtx.lineWidth=1.5; gCtx.strokeStyle='#fff'; gCtx.beginPath(); gCtx.moveTo(0, H-5);
+          for(let k=0; k<=W; k+=3){
+             let sig = (Math.abs(Math.sin((k*config.fq) + gcT)) * (Math.sin((k*0.01)+gcT*4))) * H*0.8;
+             if (Math.sin(k+gcT) > 0.95 && config.surge) sig+= 20;
+             gCtx.lineTo(k, (H-5) - sig);
+          } 
+          gCtx.lineTo(W, H-5); gCtx.stroke();
+          
+          let shd = gCtx.createLinearGradient(0,0,0,H); shd.addColorStop(0,gcolor()); shd.addColorStop(1,'transparent');
+          gCtx.fillStyle=shd; gCtx.globalAlpha=0.6; gCtx.fill(); gCtx.globalAlpha=1;
+      } else if (config.type === 'blocks') {
+          let numW = W/35;
+          for (let m=0; m<W; m+=numW) {
+             let hMod = (Math.sin(m*config.fq + gcT*0.5) * H*0.5) + (Math.cos(m)*10) + H*0.2; 
+             if(hMod < 5) hMod = 5;
+             gCtx.fillStyle=gcolor(); gCtx.fillRect(m, H - hMod, numW-2, hMod);
+          }
+      } requestAnimationFrame(runGrid);
+   } runGrid();
+}
+
+
+// ----- DYNAMIC SONAR RADAR PLOTTING DATA TARGET DETECTION -----
+function runRadar() {
+    let rc = document.getElementById('radarCanv'); let ctx2 = rc.getContext('2d'); rc.width = rc.parentElement.clientWidth - 12; 
+    let w=rc.width, h=rc.height, md = w/2, mdy = h/2, mx = (h/2)-10; let rAng=0; 
+    let pts = Array.from({length:8}, ()=>({a:Math.random()*Math.PI*2, d:Math.random()*mx}));
+    
+    function plot(){
+       ctx2.clearRect(0,0,w,h); rAng += 0.05;
+       ctx2.strokeStyle='rgba(255,255,255,0.2)'; ctx2.lineWidth=1;
+       ctx2.beginPath(); ctx2.arc(md,mdy, mx*0.33, 0, 7); ctx2.stroke();
+       ctx2.beginPath(); ctx2.arc(md,mdy, mx*0.66, 0, 7); ctx2.stroke(); ctx2.beginPath(); ctx2.arc(md,mdy, mx, 0, 7); ctx2.stroke();
+
+       ctx2.save(); ctx2.translate(md,mdy); ctx2.rotate(rAng);
+       let cg = ctx2.createLinearGradient(0,0,0,mx); cg.addColorStop(0,'transparent'); cg.addColorStop(1,gcolor());
+       ctx2.fillStyle=cg; ctx2.beginPath(); ctx2.moveTo(0,0); ctx2.arc(0,0, mx, 0, 0.4); ctx2.closePath(); ctx2.fill();
+       ctx2.strokeStyle="#fff"; ctx2.beginPath(); ctx2.moveTo(0,0); ctx2.lineTo(mx, 0); ctx2.stroke(); ctx2.restore();
+
+       pts.forEach(p => {
+          let dpX = md + Math.cos(p.a)*p.d; let dpY = mdy + Math.sin(p.a)*p.d;
+          let relA = rAng%(Math.PI*2); let aDf = (Math.PI*2 + relA - p.a)%(Math.PI*2);
+          let cA = (aDf < 0.6) ? 1 - (aDf/0.6) : 0;
+          if (cA > 0) { ctx2.fillStyle = '#fff'; ctx2.beginPath(); ctx2.arc(dpX,dpY, 4 * cA + 1, 0, 7); ctx2.fill();
+                        ctx2.strokeStyle=gcolor(); ctx2.strokeRect(dpX-5, dpY-5, 10, 10); }
+       });
+       if(Math.random()>0.97) pts[Math.floor(Math.random()*pts.length)] = {a:Math.random()*Math.PI*2, d:Math.random()*mx};
+       requestAnimationFrame(plot);
+    } plot();
+}
+
+
+// ----- COMMAND LINE INPUT FORM FUNCTION INJECTIONS  -----
+document.getElementById('tForm').onsubmit = (ev) => {
+   ev.preventDefault();
+   const inp = document.getElementById('tIn'); const lBox = document.getElementById('term-out');
+   let cv = inp.value.toUpperCase(); inp.value = "";
+   if(!cv) return;
+   
+   let rs = "";
+   if(cv==="COMBAT") { document.body.className = "mode-combat"; rs = "!! DEFCON ALERT OVERRIDE !! WEAPONS HOT."; energyM=2.5; setTimeout(()=>energyM=1,1000);}
+   else if (cv==="STEALTH") { document.body.className = "mode-stealth"; rs = "[STEALTH HIDE ON] EMISSIONS SUPPRESSED."; energyM=0.5; }
+   else if (cv==="RESET") { document.body.className = ""; rs = "MASTER.CSS RESYNC OK - BACK ONLINE."; energyM=1.0; }
+   else if (cv==="CLEAR") { lBox.innerHTML=""; return;}
+   else rs = `"${cv}" > EXECUTED COMMAND LINK. UNKNOWN OR ACCEPTED...`;
+
+   let nt = document.createElement("div"); nt.innerHTML = `<span>> [U]: ${cv}</span><br/><span style="color:#fff">${rs}</span>`;
+   lBox.appendChild(nt); lBox.scrollTop = lBox.scrollHeight;
+}
+
+
+setInterval(()=>{
+    document.getElementById('hudTime').innerHTML = (new Date()).toLocaleTimeString([], {hour12:false});
+    document.querySelectorAll('.cbar').forEach(br=>{
+       if(Math.random()>0.6) {
+           let tg = parseInt(br.getAttribute('data-p')); 
+           br.style.width = (tg + Math.floor(Math.random()*16 - 8)) + "%";
+       }
+    });
+}, 1000);
+
+const sysLog = ["KERN_VER. 22x6001_A_OK..","ENCRYPTION [##.....] DECODE ROOT.","BYPASS NETWORK UPLINK.","HUD UX 3D FRAME MATRIX INJECTION... ZOOM SYSTEMS ACTIVE.",">_ READY."];
+const blg = document.getElementById('boot-log'); const msk = document.getElementById('boot-mask');
+const fsh = document.getElementById('gl-flash');
+
+let blLine = 0;
+function hBoots() {
+  if (blLine < sysLog.length) {
+    let dv = document.createElement('div'); dv.innerText = sysLog[blLine];
+    blg.appendChild(dv); blLine++; setTimeout(hBoots, Math.random()*250 + 200);
+  } else {
+    setTimeout(()=>{
+      fsh.style.opacity="1"; msk.style.display="none"; 
+      runReactor(); bldChart('gr1', {type:'waveform', fq:0.04, spd:-0.05, surge:true});
+      bldChart('gr2', {type:'blocks', fq:0.12, spd:-0.03}); bldChart('gr3', {type:'waveform', fq:0.02, spd:0.07});
+      runRadar(); 
+      let faT = 1; let fi = setInterval(()=>{
+         faT-=0.05; fsh.style.opacity=faT; 
+         if(faT<=0) { clearInterval(fi); document.getElementById('term-out').innerHTML+="> ONLINE.<br/>> ENTERING READY MODE."; }
+      }, 50);
+    }, 400); 
+  }
+}
+window.onload = () => setTimeout(hBoots, 500); 
+</script>
+</body>
+</html>
